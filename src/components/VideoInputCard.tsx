@@ -18,6 +18,7 @@ interface VideoInputCardProps {
   currentUrl: string;
   videoTitle: string;
   onUrlChange: (url: string) => void;
+  onPublicUrlChange?: (url: string) => void;
   onTitleChange: (title: string) => void;
   onShowToast: (message: string, type?: 'success' | 'info' | 'warning' | 'error') => void;
 }
@@ -26,6 +27,7 @@ export const VideoInputCard: React.FC<VideoInputCardProps> = ({
   currentUrl,
   videoTitle,
   onUrlChange,
+  onPublicUrlChange,
   onTitleChange,
   onShowToast,
 }) => {
@@ -36,20 +38,31 @@ export const VideoInputCard: React.FC<VideoInputCardProps> = ({
   const [uploadedFileSize, setUploadedFileSize] = useState<number | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [lastFile, setLastFile] = useState<File | null>(null);
+  const [previewError, setPreviewError] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const videoPreviewRef = useRef<HTMLVideoElement | null>(null);
 
   const videoMeta = detectVideoSource(currentUrl);
 
+  // Automatically reload video element when currentUrl updates
+  React.useEffect(() => {
+    setPreviewError(null);
+    if (videoPreviewRef.current) {
+      videoPreviewRef.current.load();
+    }
+  }, [currentUrl]);
+
   const handleUrlSubmit = (url: string) => {
     const clean = url.trim();
     if (!clean) return;
     onUrlChange(clean);
+    if (onPublicUrlChange) onPublicUrlChange(clean);
   };
 
   const setPreset = (url: string, name: string) => {
     onUrlChange(url);
+    if (onPublicUrlChange) onPublicUrlChange(url);
     onTitleChange(name);
     onShowToast(`Loaded sample: ${name}`, 'info');
   };
@@ -64,10 +77,16 @@ export const VideoInputCard: React.FC<VideoInputCardProps> = ({
     setUploadedFileName(file.name);
     setUploadedFileSize(file.size);
     onTitleChange(file.name.replace(/\.[^/.]+$/, ''));
-    setIsUploading(true);
-    setUploadProgress(10);
 
-    // 1. First attempt: Upload to full-stack Express server /api/upload
+    // 1. CRITICAL: Immediately create local blob URL so preview player plays IMMEDIATELY with 0 delay!
+    const localBlobUrl = URL.createObjectURL(file);
+    onUrlChange(localBlobUrl);
+    onShowToast(`Video loaded into live preview: ${file.name}`, 'success');
+
+    setIsUploading(true);
+    setUploadProgress(15);
+
+    // 2. Background upload to full-stack Express server /api/upload
     try {
       const formData = new FormData();
       formData.append('video', file);
@@ -78,7 +97,7 @@ export const VideoInputCard: React.FC<VideoInputCardProps> = ({
       xhr.upload.onprogress = (e) => {
         if (e.lengthComputable) {
           const percent = Math.round((e.loaded / e.total) * 100);
-          setUploadProgress(Math.max(10, percent));
+          setUploadProgress(Math.max(15, percent));
         }
       };
 
@@ -105,11 +124,13 @@ export const VideoInputCard: React.FC<VideoInputCardProps> = ({
 
       setUploadProgress(100);
       setIsUploading(false);
-      onUrlChange(res.url);
-      onShowToast('Video uploaded and hosted on server for streaming!', 'success');
+      if (onPublicUrlChange) {
+        onPublicUrlChange(res.url);
+      }
+      onShowToast('Video hosted for mobile QR code streaming!', 'success');
       return;
     } catch {
-      // 2. Second attempt: Upload to public tmpfiles.org for external mobile scan support
+      // 3. Fallback: Upload to public tmpfiles.org for external mobile scan support
       try {
         setUploadProgress(35);
         const tmpFormData = new FormData();
@@ -131,7 +152,6 @@ export const VideoInputCard: React.FC<VideoInputCardProps> = ({
               try {
                 const data = JSON.parse(tmpXhr.responseText);
                 if (data?.data?.url) {
-                  // Direct stream link
                   const raw = data.data.url.replace('http://', 'https://');
                   const directUrl = raw.replace('https://tmpfiles.org/', 'https://tmpfiles.org/dl/');
                   resolve(directUrl);
@@ -153,15 +173,19 @@ export const VideoInputCard: React.FC<VideoInputCardProps> = ({
 
         setUploadProgress(100);
         setIsUploading(false);
-        onUrlChange(cloudUrl);
-        onShowToast('Video uploaded to public cloud host! Scannable anywhere.', 'success');
+        if (onPublicUrlChange) {
+          onPublicUrlChange(cloudUrl);
+        }
+        onShowToast('Video cloud hosted for mobile QR scanning!', 'success');
         return;
       } catch {
-        // Local preview fallback
+        // Local preview remains fully working!
         setIsUploading(false);
-        const localBlob = URL.createObjectURL(file);
-        onUrlChange(localBlob);
-        onShowToast('Using local video stream for preview.', 'warning');
+        setUploadProgress(100);
+        if (onPublicUrlChange) {
+          onPublicUrlChange(localBlobUrl);
+        }
+        onShowToast('Local preview active. Cloud upload optional.', 'info');
       }
     }
   };
@@ -429,13 +453,37 @@ export const VideoInputCard: React.FC<VideoInputCardProps> = ({
               allowFullScreen
             />
           ) : (
-            <video
-              ref={videoPreviewRef}
-              src={currentUrl}
-              controls
-              playsInline
-              className="w-full h-full object-contain"
-            />
+            <div className="relative w-full h-full flex items-center justify-center">
+              <video
+                ref={videoPreviewRef}
+                key={currentUrl}
+                src={currentUrl}
+                controls
+                playsInline
+                preload="auto"
+                className="w-full h-full object-contain"
+                onError={() => {
+                  setPreviewError('Unable to decode video format in this browser. Try uploading an MP4 (H.264).');
+                }}
+              />
+              {previewError && (
+                <div className="absolute inset-0 bg-slate-950/90 flex flex-col items-center justify-center p-4 text-center">
+                  <p className="text-xs text-rose-300 font-medium mb-2">{previewError}</p>
+                  <button
+                    onClick={() => {
+                      setPreviewError(null);
+                      if (videoPreviewRef.current) {
+                        videoPreviewRef.current.load();
+                        videoPreviewRef.current.play().catch(() => {});
+                      }
+                    }}
+                    className="text-xs bg-slate-800 hover:bg-slate-700 text-white px-3 py-1.5 rounded-lg border border-slate-700 transition"
+                  >
+                    Retry Playback
+                  </button>
+                </div>
+              )}
+            </div>
           )}
         </div>
       </div>

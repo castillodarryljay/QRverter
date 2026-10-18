@@ -55,6 +55,7 @@ export const WatchPage: React.FC<WatchPageProps> = ({
     if (!videoRef.current || isEmbed) return;
 
     const video = videoRef.current;
+    video.load();
     video.muted = true; // Mobile autoplay policy requires muted initially
     setIsMuted(true);
 
@@ -290,8 +291,10 @@ export const WatchPage: React.FC<WatchPageProps> = ({
             <>
               <video
                 ref={videoRef}
+                key={videoUrl}
                 src={videoUrl}
                 playsInline
+                preload="auto"
                 loop={isLooping}
                 onTimeUpdate={handleTimeUpdate}
                 onLoadedMetadata={handleLoadedMetadata}

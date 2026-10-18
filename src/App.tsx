@@ -57,6 +57,7 @@ export default function App() {
   const [videoUrl, setVideoUrl] = useState<string>(
     'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4'
   );
+  const [publicVideoUrl, setPublicVideoUrl] = useState<string>('');
   const [videoTitle, setVideoTitle] = useState<string>('High Sierra Trail — 4K Stream');
 
   // QR Customization State
@@ -158,10 +159,11 @@ export default function App() {
   }, []);
 
   // Compute live destination URL based on mode
+  const effectiveStreamUrl = publicVideoUrl || videoUrl;
   const destinationUrl =
     qrConfig.targetMode === 'watch-page'
-      ? buildWatchUrl(videoUrl, videoTitle, appBaseUrl || (typeof window !== 'undefined' ? window.location.origin : ''))
-      : videoUrl;
+      ? buildWatchUrl(effectiveStreamUrl, videoTitle, appBaseUrl || (typeof window !== 'undefined' ? window.location.origin : ''))
+      : effectiveStreamUrl;
 
   // Load custom logo image if provided
   useEffect(() => {
@@ -347,6 +349,7 @@ export default function App() {
         onOpenInfo={() => setIsInfoOpen(true)}
         onSelectPreset={() => {
           setVideoUrl('https://www.youtube.com/watch?v=aqz-KE-bpKQ');
+          setPublicVideoUrl('');
           setVideoTitle('Big Buck Bunny 4K (YouTube)');
           showToast('Loaded YouTube 4K Demo Preset!', 'info');
         }}
@@ -397,7 +400,13 @@ export default function App() {
             <VideoInputCard
               currentUrl={videoUrl}
               videoTitle={videoTitle}
-              onUrlChange={setVideoUrl}
+              onUrlChange={(url) => {
+                setVideoUrl(url);
+                setPublicVideoUrl('');
+              }}
+              onPublicUrlChange={(pubUrl) => {
+                setPublicVideoUrl(pubUrl);
+              }}
               onTitleChange={setVideoTitle}
               onShowToast={showToast}
             />
