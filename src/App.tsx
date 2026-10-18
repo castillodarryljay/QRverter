@@ -24,6 +24,7 @@ import { WatchPage } from './components/WatchPage.tsx';
 import { QRScannerModal } from './components/QRScannerModal.tsx';
 import { InfoModal } from './components/InfoModal.tsx';
 import { SavedQRsModal } from './components/SavedQRsModal.tsx';
+import { GoogleAuthModal } from './components/GoogleAuthModal.tsx';
 import { useAuth, CloudQRCode } from './context/AuthContext.tsx';
 import { QRConfig, QRHistoryItem, QRTargetMode, ErrorCorrectionLevel, CenterLogoMode } from './types/index.ts';
 import { buildWatchUrl } from './utils/videoHelper.ts';
@@ -62,7 +63,7 @@ export default function App() {
   const [qrConfig, setQrConfig] = useState<QRConfig>(DEFAULT_CONFIG);
 
   // Auth & Cloud Sync
-  const { user, signInWithGoogle, saveCurrentQRToCloud } = useAuth();
+  const { user, signInWithGoogle, saveCurrentQRToCloud, authError, clearAuthError } = useAuth();
   const [isCloudModalOpen, setIsCloudModalOpen] = useState(false);
 
   // Modals & Popups
@@ -506,6 +507,14 @@ export default function App() {
           setCurrentWatchUrl(url);
           setCurrentWatchTitle(title);
         }}
+      />
+
+      {/* Google Auth Vercel Helper & Diagnostic Modal */}
+      <GoogleAuthModal
+        isOpen={!!authError}
+        onClose={clearAuthError}
+        errorCode={authError?.code}
+        errorMessage={authError?.message}
       />
     </div>
   );

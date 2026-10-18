@@ -1,5 +1,14 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, User } from 'firebase/auth';
+import {
+  getAuth,
+  GoogleAuthProvider,
+  signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
+  signOut,
+  onAuthStateChanged,
+  User,
+} from 'firebase/auth';
 import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
 
@@ -9,6 +18,7 @@ export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: 'select_account' });
+export { firebaseConfig };
 
 // Firestore Error Helper conforming to skill specs
 export enum OperationType {
@@ -70,5 +80,5 @@ export async function testFirestoreConnection() {
   }
 }
 
-export { signInWithPopup, signOut, onAuthStateChanged };
+export { signInWithPopup, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged };
 export type { User };
