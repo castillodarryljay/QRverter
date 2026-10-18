@@ -1,0 +1,6 @@
+{
+  "name": "VidQR Studio",
+  "description": "Convert any video link or uploaded video into an interactive scannable QR code that instantly plays on any mobile phone or browser when scanned.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
