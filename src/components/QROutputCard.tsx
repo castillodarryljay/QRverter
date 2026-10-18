@@ -78,8 +78,23 @@ export const QROutputCard: React.FC<QROutputCardProps> = ({
         </div>
       </div>
 
+      {/* Cloud Stream Status Indicator */}
+      {destinationUrl.includes('blob:') ? (
+        <div className="w-full mt-3 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-300 text-xs flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse shrink-0" />
+          <span>Uploading to Firebase Cloud Storage... QR will auto-update to public stream.</span>
+        </div>
+      ) : destinationUrl.includes('firebasestorage.googleapis.com') ? (
+        <div className="w-full mt-3 p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-emerald-300 text-xs flex items-center justify-between">
+          <span className="flex items-center gap-1.5 font-medium">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
+            <span>Firebase Cloud Storage Stream (Scannable on all phones)</span>
+          </span>
+        </div>
+      ) : null}
+
       {/* Encoded Destination Link Pill */}
-      <div className="w-full mt-4 bg-slate-950 border border-slate-800/90 rounded-xl p-3 flex items-center justify-between gap-2">
+      <div className="w-full mt-3 bg-slate-950 border border-slate-800/90 rounded-xl p-3 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
           <LinkIcon className="w-4 h-4 text-indigo-400 shrink-0" />
           <span className="text-xs text-slate-300 font-mono truncate">

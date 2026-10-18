@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { detectVideoSource, formatFileSize } from '../utils/videoHelper.ts';
 import { compressVideoFile, CompressionResult } from '../utils/videoCompressor.ts';
+import { uploadVideoToFirebaseStorage } from '../firebase.ts';
 
 interface VideoInputCardProps {
   currentUrl: string;
@@ -128,8 +129,27 @@ export const VideoInputCard: React.FC<VideoInputCardProps> = ({
     setIsUploading(true);
     setUploadProgress(15);
 
-    // 3. Fast Server / Cloud Upload Pipeline
-    // Try local /api/upload first with short 2s timeout
+    // 3. Primary: Upload directly to Firebase Cloud Storage (Google Cloud CDN)
+    try {
+      setUploadProgress(20);
+      const firebaseUrl = await uploadVideoToFirebaseStorage(
+        fileToUpload,
+        file.name,
+        (p) => setUploadProgress(Math.max(20, p))
+      );
+
+      setUploadProgress(100);
+      setIsUploading(false);
+      if (onPublicUrlChange) {
+        onPublicUrlChange(firebaseUrl);
+      }
+      onShowToast('Video uploaded to Firebase Storage! High-speed mobile streaming ready.', 'success');
+      return;
+    } catch (fbErr) {
+      console.warn('Firebase Storage upload error, falling back to server/cloud:', fbErr);
+    }
+
+    // 4. Secondary: Server /api/upload
     try {
       const formData = new FormData();
       formData.append('video', fileToUpload);
