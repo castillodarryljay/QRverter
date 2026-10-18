@@ -72,6 +72,7 @@ app.get('/api/videos/:filename', (req, res) => {
   const filename = path.basename(req.params.filename);
   const filePath = path.join(uploadsDir, filename);
 
+function streamVideoFile(filePath: string, req: express.Request, res: express.Response) {
   if (!fs.existsSync(filePath)) {
     res.status(404).send('Video not found');
     return;
@@ -81,7 +82,7 @@ app.get('/api/videos/:filename', (req, res) => {
   const fileSize = stat.size;
   const range = req.headers.range;
 
-  const ext = path.extname(filename).toLowerCase();
+  const ext = path.extname(filePath).toLowerCase();
   const mimeTypes: Record<string, string> = {
     '.mp4': 'video/mp4',
     '.webm': 'video/webm',
@@ -90,6 +91,8 @@ app.get('/api/videos/:filename', (req, res) => {
     '.m4v': 'video/mp4',
   };
   const contentType = mimeTypes[ext] || 'video/mp4';
+
+  res.setHeader('Access-Control-Allow-Origin', '*');
 
   if (range) {
     const parts = range.replace(/bytes=/, '').split('-');
@@ -121,6 +124,20 @@ app.get('/api/videos/:filename', (req, res) => {
     res.writeHead(200, head);
     fs.createReadStream(filePath).pipe(res);
   }
+}
+
+// API: Stream uploaded videos
+app.get('/api/videos/:filename', (req, res) => {
+  const filename = path.basename(req.params.filename);
+  const filePath = path.join(uploadsDir, filename);
+  streamVideoFile(filePath, req, res);
+});
+
+// Stream sample videos with range support
+app.get('/samples/:filename', (req, res) => {
+  const filename = path.basename(req.params.filename);
+  const filePath = path.join(__dirname, 'public', 'samples', filename);
+  streamVideoFile(filePath, req, res);
 });
 
 // App URL helper endpoint
@@ -133,12 +150,21 @@ app.get('/api/app-info', (_req, res) => {
 
 // Vite middleware in dev or static files in prod
 async function startServer() {
+  // Mount public directory
+  app.use(express.static(path.join(__dirname, 'public')));
+
   if (!isProd) {
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',
     });
     app.use(vite.middlewares);
+  } else {
+    app.use(express.static(path.join(__dirname, 'dist')));
+    app.get('*', (_req, res) => {
+      res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+    });
+  }
   } else {
     app.use(express.static(path.join(__dirname, 'dist')));
     app.get('*', (_req, res) => {

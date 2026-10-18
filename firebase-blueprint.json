@@ -1,0 +1,118 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User account information and profile",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "Firebase user UID"
+        },
+        "email": {
+          "type": "string",
+          "description": "User email address"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "User display name"
+        },
+        "photoURL": {
+          "type": "string",
+          "description": "User avatar photo URL"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Account creation timestamp"
+        }
+      },
+      "required": [
+        "uid",
+        "email"
+      ]
+    },
+    "QRCode": {
+      "title": "QRCode",
+      "description": "Generated and saved video QR code item",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique QR item ID"
+        },
+        "userId": {
+          "type": "string",
+          "description": "Owner user UID"
+        },
+        "title": {
+          "type": "string",
+          "description": "Video title or description"
+        },
+        "videoUrl": {
+          "type": "string",
+          "description": "Video stream or platform URL"
+        },
+        "destinationUrl": {
+          "type": "string",
+          "description": "Encoded QR destination URL"
+        },
+        "targetMode": {
+          "type": "string",
+          "description": "Watch page or direct link mode"
+        },
+        "fgColor": {
+          "type": "string",
+          "description": "Foreground color hex code"
+        },
+        "bgColor": {
+          "type": "string",
+          "description": "Background color hex code"
+        },
+        "size": {
+          "type": "number",
+          "description": "Resolution size in pixels"
+        },
+        "errorCorrectionLevel": {
+          "type": "string",
+          "description": "Error correction level L, M, Q, or H"
+        },
+        "logoMode": {
+          "type": "string",
+          "description": "Center logo type"
+        },
+        "includeBanner": {
+          "type": "boolean",
+          "description": "Whether CTA banner is included"
+        },
+        "bannerText": {
+          "type": "string",
+          "description": "Custom call-to-action banner text"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Creation timestamp"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Last update timestamp"
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "videoUrl",
+        "destinationUrl"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profile collection by UID"
+    },
+    "/users/{userId}/qrCodes/{qrCodeId}": {
+      "schema": "QRCode",
+      "description": "Saved QR codes belonging to a user"
+    }
+  }
+}

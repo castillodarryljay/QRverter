@@ -7,9 +7,11 @@ import {
   Link as LinkIcon,
   Check,
   Play,
-  Share2
+  Cloud,
+  Bookmark
 } from 'lucide-react';
 import { QRConfig } from '../types/index.ts';
+import { useAuth } from '../context/AuthContext.tsx';
 
 interface QROutputCardProps {
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
@@ -20,6 +22,7 @@ interface QROutputCardProps {
   onCopyImage: () => void;
   onOpenScannerModal: () => void;
   onOpenWatchPage: () => void;
+  onSaveToCloud: () => void;
   onShowToast: (msg: string, type?: 'success' | 'info') => void;
 }
 
@@ -32,9 +35,12 @@ export const QROutputCard: React.FC<QROutputCardProps> = ({
   onCopyImage,
   onOpenScannerModal,
   onOpenWatchPage,
+  onSaveToCloud,
   onShowToast,
 }) => {
+  const { user } = useAuth();
   const [copiedUrl, setCopiedUrl] = React.useState(false);
+  const [isSaved, setIsSaved] = React.useState(false);
 
   const copyUrl = async () => {
     try {
@@ -110,24 +116,37 @@ export const QROutputCard: React.FC<QROutputCardProps> = ({
       <div className="w-full grid grid-cols-2 gap-3 mt-2.5">
         <button
           onClick={onCopyImage}
-          className="w-full py-2.5 px-3 rounded-xl bg-slate-950 hover:bg-slate-800/80 text-slate-300 hover:text-white text-xs font-medium border border-slate-800 flex items-center justify-center gap-1.5 transition"
+          className="w-full py-2.5 px-3 rounded-xl bg-slate-950 hover:bg-slate-800/80 text-slate-300 hover:text-white text-xs font-medium border border-slate-800 flex items-center justify-center gap-1.5 transition cursor-pointer"
         >
           <Copy className="w-3.5 h-3.5 text-slate-400" />
           <span>Copy QR Image</span>
         </button>
         <button
           onClick={onOpenScannerModal}
-          className="w-full py-2.5 px-3 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 text-xs font-medium border border-emerald-500/25 flex items-center justify-center gap-1.5 transition"
+          className="w-full py-2.5 px-3 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 text-xs font-medium border border-emerald-500/25 flex items-center justify-center gap-1.5 transition cursor-pointer"
         >
           <ScanLine className="w-3.5 h-3.5 text-emerald-400" />
           <span>Test Scanner</span>
         </button>
       </div>
 
+      {/* Save to Cloud Button */}
+      <button
+        onClick={() => {
+          onSaveToCloud();
+          setIsSaved(true);
+          setTimeout(() => setIsSaved(false), 2400);
+        }}
+        className="w-full mt-2.5 py-2 px-3 rounded-xl bg-slate-950 hover:bg-slate-800/80 text-indigo-400 hover:text-indigo-300 text-xs font-medium border border-indigo-500/30 flex items-center justify-center gap-1.5 transition cursor-pointer"
+      >
+        <Cloud className="w-3.5 h-3.5" />
+        <span>{user ? (isSaved ? 'Saved to Google Account!' : 'Save QR to Google Account') : 'Sign in with Google to Save'}</span>
+      </button>
+
       {/* Test Play Video directly */}
       <button
         onClick={onOpenWatchPage}
-        className="w-full mt-3 py-2 px-3 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 hover:text-indigo-200 text-xs font-medium border border-indigo-500/20 flex items-center justify-center gap-1.5 transition"
+        className="w-full mt-2.5 py-2 px-3 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 hover:text-indigo-200 text-xs font-medium border border-indigo-500/20 flex items-center justify-center gap-1.5 transition cursor-pointer"
       >
         <Play className="w-3.5 h-3.5 fill-current" />
         <span>Watch Video Player (What Mobile Scanners See)</span>

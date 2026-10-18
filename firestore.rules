@@ -1,0 +1,73 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 1. Global default-deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Common security helpers
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // Helper validation for User
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'email']) &&
+             data.keys().hasOnly(['uid', 'email', 'displayName', 'photoURL', 'createdAt']) &&
+             data.uid is string && data.uid.size() <= 128 &&
+             data.email is string && data.email.size() <= 256;
+    }
+
+    // Helper validation for QRCode
+    function isValidQRCode(data) {
+      return data.keys().hasAll(['id', 'userId', 'videoUrl', 'destinationUrl']) &&
+             data.keys().hasOnly([
+               'id', 'userId', 'title', 'videoUrl', 'destinationUrl',
+               'targetMode', 'fgColor', 'bgColor', 'size',
+               'errorCorrectionLevel', 'logoMode', 'includeBanner',
+               'bannerText', 'createdAt', 'updatedAt'
+             ]) &&
+             data.id is string && data.id.size() <= 128 &&
+             data.userId is string && data.userId.size() <= 128 &&
+             data.videoUrl is string && data.videoUrl.size() <= 2048 &&
+             data.destinationUrl is string && data.destinationUrl.size() <= 2048;
+    }
+
+    // User profiles collection
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidUser(incoming()) && incoming().uid == request.auth.uid;
+      allow update: if isOwner(userId) && isValidUser(incoming()) && incoming().uid == existing().uid;
+      allow delete: if false;
+
+      // User saved QR codes subcollection
+      match /qrCodes/{qrCodeId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidId(qrCodeId) &&
+                         isValidQRCode(incoming()) &&
+                         incoming().userId == request.auth.uid;
+        allow update: if isOwner(userId) && isValidId(qrCodeId) &&
+                         isValidQRCode(incoming()) &&
+                         incoming().userId == existing().userId;
+        allow delete: if isOwner(userId);
+      }
+    }
+  }
+}

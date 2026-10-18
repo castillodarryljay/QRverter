@@ -23,7 +23,9 @@ import { QROutputCard } from './components/QROutputCard.tsx';
 import { WatchPage } from './components/WatchPage.tsx';
 import { QRScannerModal } from './components/QRScannerModal.tsx';
 import { InfoModal } from './components/InfoModal.tsx';
-import { QRConfig, QRHistoryItem } from './types/index.ts';
+import { SavedQRsModal } from './components/SavedQRsModal.tsx';
+import { useAuth, CloudQRCode } from './context/AuthContext.tsx';
+import { QRConfig, QRHistoryItem, QRTargetMode, ErrorCorrectionLevel, CenterLogoMode } from './types/index.ts';
 import { buildWatchUrl } from './utils/videoHelper.ts';
 import { renderQRToCanvas, exportQRAsSVG } from './utils/qrRenderer.ts';
 
@@ -58,6 +60,10 @@ export default function App() {
 
   // QR Customization State
   const [qrConfig, setQrConfig] = useState<QRConfig>(DEFAULT_CONFIG);
+
+  // Auth & Cloud Sync
+  const { user, signInWithGoogle, saveCurrentQRToCloud } = useAuth();
+  const [isCloudModalOpen, setIsCloudModalOpen] = useState(false);
 
   // Modals & Popups
   const [isScannerOpen, setIsScannerOpen] = useState(false);
@@ -247,6 +253,42 @@ export default function App() {
     }
   };
 
+  const handleSaveToCloud = async () => {
+    if (!user) {
+      try {
+        await signInWithGoogle();
+        showToast('Signed in with Google! Click save again to store your QR code.', 'info');
+      } catch {
+        showToast('Google sign-in was cancelled.', 'error');
+      }
+      return;
+    }
+    const saved = await saveCurrentQRToCloud(videoTitle, videoUrl, destinationUrl, qrConfig);
+    if (saved) {
+      confetti({ particleCount: 35, spread: 55, origin: { y: 0.8 } });
+      showToast('Saved video QR code to your Google account!', 'success');
+    } else {
+      showToast('Could not save QR code to cloud.', 'error');
+    }
+  };
+
+  const handleLoadCloudQR = (qr: CloudQRCode) => {
+    setVideoUrl(qr.videoUrl);
+    setVideoTitle(qr.title);
+    setQrConfig({
+      targetMode: qr.targetMode as QRTargetMode,
+      fgColor: qr.fgColor,
+      bgColor: qr.bgColor,
+      size: qr.size,
+      errorCorrectionLevel: qr.errorCorrectionLevel as ErrorCorrectionLevel,
+      logoMode: qr.logoMode as CenterLogoMode,
+      customLogoDataUrl: null,
+      includeBanner: qr.includeBanner,
+      bannerText: qr.bannerText,
+    });
+    showToast(`Loaded "${qr.title}" from your cloud library!`, 'info');
+  };
+
   const resetConfig = () => {
     setQrConfig(DEFAULT_CONFIG);
     showToast('Reset QR customizations to default.', 'info');
@@ -308,6 +350,7 @@ export default function App() {
           showToast('Loaded YouTube 4K Demo Preset!', 'info');
         }}
         onScrollToGenerator={scrollToGenerator}
+        onOpenCloudModal={() => setIsCloudModalOpen(true)}
       />
 
       {/* Main Content Layout */}
@@ -331,14 +374,14 @@ export default function App() {
           <div className="flex items-center gap-3 shrink-0">
             <button
               onClick={() => setIsInfoOpen(true)}
-              className="text-xs font-medium text-slate-300 hover:text-white bg-slate-800/80 hover:bg-slate-800 border border-slate-700 px-3.5 py-2 rounded-xl flex items-center gap-1.5 transition"
+              className="text-xs font-medium text-slate-300 hover:text-white bg-slate-800/80 hover:bg-slate-800 border border-slate-700 px-3.5 py-2 rounded-xl flex items-center gap-1.5 transition cursor-pointer"
             >
               <Info className="w-4 h-4 text-indigo-400" />
               <span>How It Works</span>
             </button>
             <button
               onClick={() => setIsScannerOpen(true)}
-              className="text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-500 shadow-lg shadow-indigo-600/25 px-4 py-2 rounded-xl flex items-center gap-1.5 transition active:scale-95"
+              className="text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-500 shadow-lg shadow-indigo-600/25 px-4 py-2 rounded-xl flex items-center gap-1.5 transition active:scale-95 cursor-pointer"
             >
               <QrCode className="w-4 h-4" />
               <span>Test & Scan QR</span>
@@ -380,6 +423,7 @@ export default function App() {
                 setCurrentWatchUrl(videoUrl);
                 setCurrentWatchTitle(videoTitle);
               }}
+              onSaveToCloud={handleSaveToCloud}
               onShowToast={showToast}
             />
 
@@ -452,6 +496,17 @@ export default function App() {
 
       {/* Educational How It Works Modal */}
       <InfoModal isOpen={isInfoOpen} onClose={() => setIsInfoOpen(false)} />
+
+      {/* Cloud Saved QRs Modal */}
+      <SavedQRsModal
+        isOpen={isCloudModalOpen}
+        onClose={() => setIsCloudModalOpen(false)}
+        onLoadQR={handleLoadCloudQR}
+        onOpenWatchPage={(url, title) => {
+          setCurrentWatchUrl(url);
+          setCurrentWatchTitle(title);
+        }}
+      />
     </div>
   );
 }
