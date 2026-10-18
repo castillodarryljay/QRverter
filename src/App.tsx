@@ -24,6 +24,7 @@ import { WatchPage } from './components/WatchPage.tsx';
 import { QRScannerModal } from './components/QRScannerModal.tsx';
 import { InfoModal } from './components/InfoModal.tsx';
 import { SavedQRsModal } from './components/SavedQRsModal.tsx';
+import { AccountDashboardModal } from './components/AccountDashboardModal.tsx';
 import { GoogleAuthModal } from './components/GoogleAuthModal.tsx';
 import { useAuth, CloudQRCode } from './context/AuthContext.tsx';
 import { QRConfig, QRHistoryItem, QRTargetMode, ErrorCorrectionLevel, CenterLogoMode } from './types/index.ts';
@@ -292,6 +293,63 @@ export default function App() {
     showToast(`Loaded "${qr.title}" from your cloud library!`, 'info');
   };
 
+  const handleDownloadPNGFromQRItem = async (qr: CloudQRCode) => {
+    try {
+      const offscreen = document.createElement('canvas');
+      const itemConfig: QRConfig = {
+        targetMode: qr.targetMode as QRTargetMode,
+        fgColor: qr.fgColor,
+        bgColor: qr.bgColor,
+        size: qr.size || 340,
+        errorCorrectionLevel: qr.errorCorrectionLevel as ErrorCorrectionLevel,
+        logoMode: qr.logoMode as CenterLogoMode,
+        customLogoDataUrl: null,
+        includeBanner: qr.includeBanner,
+        bannerText: qr.bannerText || 'SCAN TO WATCH',
+      };
+      await renderQRToCanvas(offscreen, qr.destinationUrl, itemConfig);
+      const dataUrl = offscreen.toDataURL('image/png');
+      const a = document.createElement('a');
+      a.download = `${qr.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}-qr.png`;
+      a.href = dataUrl;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      showToast(`Downloaded PNG for ${qr.title}!`, 'success');
+    } catch {
+      showToast('Error downloading QR code', 'error');
+    }
+  };
+
+  const handleDownloadSVGFromQRItem = async (qr: CloudQRCode) => {
+    try {
+      const itemConfig: QRConfig = {
+        targetMode: qr.targetMode as QRTargetMode,
+        fgColor: qr.fgColor,
+        bgColor: qr.bgColor,
+        size: qr.size || 340,
+        errorCorrectionLevel: qr.errorCorrectionLevel as ErrorCorrectionLevel,
+        logoMode: qr.logoMode as CenterLogoMode,
+        customLogoDataUrl: null,
+        includeBanner: qr.includeBanner,
+        bannerText: qr.bannerText || 'SCAN TO WATCH',
+      };
+      const svgString = await exportQRAsSVG(qr.destinationUrl, itemConfig);
+      const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.download = `${qr.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}-qr.svg`;
+      a.href = url;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+      showToast(`Downloaded vector SVG for ${qr.title}!`, 'success');
+    } catch {
+      showToast('Error downloading SVG', 'error');
+    }
+  };
+
   const resetConfig = () => {
     setQrConfig(DEFAULT_CONFIG);
     showToast('Reset QR customizations to default.', 'info');
@@ -507,8 +565,8 @@ export default function App() {
       {/* Educational How It Works Modal */}
       <InfoModal isOpen={isInfoOpen} onClose={() => setIsInfoOpen(false)} />
 
-      {/* Cloud Saved QRs Modal */}
-      <SavedQRsModal
+      {/* Account & Uploads Management Dashboard */}
+      <AccountDashboardModal
         isOpen={isCloudModalOpen}
         onClose={() => setIsCloudModalOpen(false)}
         onLoadQR={handleLoadCloudQR}
@@ -516,6 +574,9 @@ export default function App() {
           setCurrentWatchUrl(url);
           setCurrentWatchTitle(title);
         }}
+        onDownloadPNGFromUrl={handleDownloadPNGFromQRItem}
+        onDownloadSVGFromUrl={handleDownloadSVGFromQRItem}
+        onShowToast={showToast}
       />
 
       {/* Google Auth Vercel Helper & Diagnostic Modal */}

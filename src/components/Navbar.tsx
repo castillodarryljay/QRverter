@@ -66,10 +66,10 @@ export const Navbar: React.FC<NavbarProps> = ({
           {user && onOpenCloudModal && (
             <button
               onClick={onOpenCloudModal}
-              className="text-indigo-400 hover:text-indigo-300 transition-colors whitespace-nowrap shrink-0 cursor-pointer flex items-center gap-1.5"
+              className="text-indigo-400 hover:text-indigo-300 transition-colors whitespace-nowrap shrink-0 cursor-pointer flex items-center gap-1.5 font-semibold"
             >
               <Cloud className="w-3.5 h-3.5" />
-              <span>My Saved QRs ({cloudQRCodes.length})</span>
+              <span>My Uploads & Acc ({cloudQRCodes.length})</span>
             </button>
           )}
         </nav>
@@ -80,7 +80,11 @@ export const Navbar: React.FC<NavbarProps> = ({
             <div className="w-7 h-7 rounded-full bg-slate-800 animate-pulse" />
           ) : user ? (
             <div className="flex items-center gap-2">
-              <div className="flex items-center gap-2 bg-slate-800/80 border border-slate-700/80 px-2.5 py-1 rounded-xl">
+              <div
+                onClick={onOpenCloudModal}
+                className="flex items-center gap-2 bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700/80 hover:border-indigo-500/50 px-2.5 py-1 rounded-xl cursor-pointer transition"
+                title="Manage Account & Uploads"
+              >
                 {user.photoURL ? (
                   <img
                     src={user.photoURL}
@@ -97,7 +101,10 @@ export const Navbar: React.FC<NavbarProps> = ({
                   {user.displayName?.split(' ')[0] || user.email?.split('@')[0]}
                 </span>
                 <button
-                  onClick={logout}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    logout();
+                  }}
                   title="Sign out"
                   className="text-slate-400 hover:text-rose-400 transition ml-1 p-0.5 rounded cursor-pointer"
                 >

@@ -45,6 +45,9 @@ export interface CloudQRCode {
   logoMode: string;
   includeBanner: boolean;
   bannerText: string;
+  originalSize?: number;
+  compressedSize?: number;
+  savedPercentage?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -69,9 +72,12 @@ interface AuthContextType {
     title: string,
     videoUrl: string,
     destinationUrl: string,
-    config: QRConfig
+    config: QRConfig,
+    sizeStats?: { originalSize?: number; compressedSize?: number; savedPercentage?: number }
   ) => Promise<CloudQRCode | null>;
   deleteCloudQR: (id: string) => Promise<boolean>;
+  updateQRTitle: (id: string, newTitle: string) => Promise<boolean>;
+  updateUserProfile: (displayName: string) => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -261,7 +267,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     title: string,
     videoUrl: string,
     destinationUrl: string,
-    config: QRConfig
+    config: QRConfig,
+    sizeStats?: { originalSize?: number; compressedSize?: number; savedPercentage?: number }
   ): Promise<CloudQRCode | null> => {
     if (!user) return null;
 
@@ -280,6 +287,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       logoMode: config.logoMode,
       includeBanner: config.includeBanner,
       bannerText: config.bannerText,
+      ...(sizeStats?.originalSize ? { originalSize: sizeStats.originalSize } : {}),
+      ...(sizeStats?.compressedSize ? { compressedSize: sizeStats.compressedSize } : {}),
+      ...(sizeStats?.savedPercentage ? { savedPercentage: sizeStats.savedPercentage } : {}),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -304,6 +314,48 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     return newQR;
+  };
+
+  const updateQRTitle = async (id: string, newTitle: string): Promise<boolean> => {
+    if (!user || !newTitle.trim()) return false;
+    const localBackupKey = `vidqr_cloud_qrs_${user.uid}`;
+
+    setCloudQRCodes((prev) => {
+      const updated = prev.map((q) =>
+        q.id === id ? { ...q, title: newTitle.trim(), updatedAt: new Date().toISOString() } : q
+      );
+      localStorage.setItem(localBackupKey, JSON.stringify(updated));
+      return updated;
+    });
+
+    if (!('isCustomSession' in user && user.isCustomSession)) {
+      try {
+        const docRef = doc(db, 'users', user.uid, 'qrCodes', id);
+        await setDoc(docRef, { title: newTitle.trim(), updatedAt: new Date().toISOString() }, { merge: true });
+      } catch (err) {
+        handleFirestoreError(err, OperationType.UPDATE, `users/${user.uid}/qrCodes/${id}`);
+      }
+    }
+
+    return true;
+  };
+
+  const updateUserProfile = async (displayName: string): Promise<boolean> => {
+    if (!user || !displayName.trim()) return false;
+    const updatedUser = { ...user, displayName: displayName.trim() };
+    setUser(updatedUser);
+
+    if ('isCustomSession' in user && user.isCustomSession) {
+      localStorage.setItem('vidqr_custom_user', JSON.stringify(updatedUser));
+    } else {
+      try {
+        const userRef = doc(db, 'users', user.uid);
+        await setDoc(userRef, { displayName: displayName.trim() }, { merge: true });
+      } catch (err) {
+        handleFirestoreError(err, OperationType.UPDATE, `users/${user.uid}`);
+      }
+    }
+    return true;
   };
 
   const deleteCloudQR = async (id: string): Promise<boolean> => {
@@ -343,6 +395,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         refreshCloudQRCodes,
         saveCurrentQRToCloud,
         deleteCloudQR,
+        updateQRTitle,
+        updateUserProfile,
       }}
     >
       {children}

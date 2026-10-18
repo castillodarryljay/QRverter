@@ -42,7 +42,8 @@ service cloud.firestore {
                'id', 'userId', 'title', 'videoUrl', 'destinationUrl',
                'targetMode', 'fgColor', 'bgColor', 'size',
                'errorCorrectionLevel', 'logoMode', 'includeBanner',
-               'bannerText', 'createdAt', 'updatedAt'
+               'bannerText', 'createdAt', 'updatedAt',
+               'originalSize', 'compressedSize', 'savedPercentage'
              ]) &&
              data.id is string && data.id.size() <= 128 &&
              data.userId is string && data.userId.size() <= 128 &&

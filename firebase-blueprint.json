@@ -95,6 +95,18 @@
         "updatedAt": {
           "type": "string",
           "description": "Last update timestamp"
+        },
+        "originalSize": {
+          "type": "number",
+          "description": "Original file size in bytes"
+        },
+        "compressedSize": {
+          "type": "number",
+          "description": "Compressed file size in bytes"
+        },
+        "savedPercentage": {
+          "type": "number",
+          "description": "Space reduction percentage"
         }
       },
       "required": [
