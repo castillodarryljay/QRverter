@@ -96,7 +96,9 @@ export const WatchPage: React.FC<WatchPageProps> = ({
     const video = videoRef.current;
     video.load();
     video.muted = true; // Mobile autoplay policy requires muted initially
+    video.playbackRate = 1.0; // Strictly normal 1.0x natural speed
     setIsMuted(true);
+    setPlaybackRate(1);
 
     const playPromise = video.play();
     if (playPromise !== undefined) {
@@ -179,6 +181,7 @@ export const WatchPage: React.FC<WatchPageProps> = ({
   const handleLoadedMetadata = () => {
     if (videoRef.current) {
       setDuration(videoRef.current.duration);
+      videoRef.current.playbackRate = playbackRate || 1.0;
     }
   };
 

@@ -109,8 +109,8 @@ export const VideoInputCard: React.FC<VideoInputCardProps> = ({
 
     let fileToUpload: File | Blob = file;
 
-    // 2. Client-side Video Compression (Saves 70%-90% space & uploads 10x faster)
-    if (enableCompression && file.size > 4 * 1024 * 1024) {
+    // 2. Client-side Video Compression (Saves 70%-90% space on larger files)
+    if (enableCompression && file.size > 8 * 1024 * 1024) {
       setIsCompressing(true);
       setCompressionProgress(10);
       try {

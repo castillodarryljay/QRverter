@@ -31,8 +31,8 @@ export async function compressVideoFile(
     onProgress,
   } = options;
 
-  // If file is already compact (less than 4MB), skip heavy compression for 0ms delay
-  if (file.size < 4 * 1024 * 1024) {
+  // If file is already compact (less than 8MB), skip heavy compression for 0ms delay
+  if (file.size < 8 * 1024 * 1024) {
     const objectUrl = URL.createObjectURL(file);
     return {
       compressedFile: file,
@@ -125,16 +125,32 @@ export async function compressVideoFile(
       // Capture canvas stream at 30fps
       const canvasStream = canvas.captureStream(30);
 
-      // Try capturing audio tracks from source video if browser supports captureStream
+      // Connect video audio to canvasStream using AudioContext so audio is preserved at 1.0x normal pitch
+      let audioCtx: AudioContext | null = null;
       try {
-        const streamSrc = (video as unknown as { captureStream?: () => MediaStream; mozCaptureStream?: () => MediaStream });
-        const videoStream = streamSrc.captureStream ? streamSrc.captureStream() : streamSrc.mozCaptureStream ? streamSrc.mozCaptureStream() : null;
-        if (videoStream) {
-          const audioTracks = videoStream.getAudioTracks();
-          audioTracks.forEach((t) => canvasStream.addTrack(t));
+        const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+        if (AudioCtx) {
+          audioCtx = new AudioCtx();
+          const sourceNode = audioCtx.createMediaElementSource(video);
+          const destNode = audioCtx.createMediaStreamDestination();
+          sourceNode.connect(destNode);
+          const audioTracks = destNode.stream.getAudioTracks();
+          if (audioTracks.length > 0) {
+            canvasStream.addTrack(audioTracks[0]);
+          }
         }
       } catch {
-        // Fallback without audio track
+        // Fallback to captureStream audio if available
+        try {
+          const streamSrc = (video as unknown as { captureStream?: () => MediaStream; mozCaptureStream?: () => MediaStream });
+          const videoStream = streamSrc.captureStream ? streamSrc.captureStream() : streamSrc.mozCaptureStream ? streamSrc.mozCaptureStream() : null;
+          if (videoStream) {
+            const audioTracks = videoStream.getAudioTracks();
+            audioTracks.forEach((t) => canvasStream.addTrack(t));
+          }
+        } catch {
+          // Fallback without audio
+        }
       }
 
       let mediaRecorder: MediaRecorder;
@@ -161,6 +177,9 @@ export async function compressVideoFile(
       };
 
       mediaRecorder.onstop = () => {
+        if (audioCtx && audioCtx.state !== 'closed') {
+          audioCtx.close().catch(() => {});
+        }
         URL.revokeObjectURL(sourceUrl);
         const finalBlob = new Blob(chunks, { type: selectedMime });
         const baseName = file.name.replace(/\.[^/.]+$/, '');
@@ -186,12 +205,16 @@ export async function compressVideoFile(
       };
 
       mediaRecorder.onerror = (e) => {
+        if (audioCtx && audioCtx.state !== 'closed') {
+          audioCtx.close().catch(() => {});
+        }
         URL.revokeObjectURL(sourceUrl);
         reject(e);
       };
 
-      // Faster transcoding playback speed (2.5x) to speed up compression significantly
-      video.playbackRate = 2.5;
+      // CRITICAL FIX: Playback speed MUST be exactly 1.0x (normal natural speed)
+      // Any value > 1.0 causes MediaRecorder to record at fast-forward speed!
+      video.playbackRate = 1.0;
 
       let animFrameId: number;
       const drawFrame = () => {
