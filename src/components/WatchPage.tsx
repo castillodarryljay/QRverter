@@ -18,6 +18,7 @@ import {
   Film
 } from 'lucide-react';
 import { detectVideoSource, formatDuration } from '../utils/videoHelper.ts';
+import { fetchVideoFromFirestore } from '../utils/firestoreVideoStore.ts';
 
 interface WatchPageProps {
   videoUrl: string;
@@ -47,12 +48,50 @@ export const WatchPage: React.FC<WatchPageProps> = ({
   const [showQRModal, setShowQRModal] = useState(false);
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const videoMeta = detectVideoSource(videoUrl);
+  // Firestore cloud stream state
+  const isFsUrl = videoUrl.startsWith('fs:');
+  const [resolvedUrl, setResolvedUrl] = useState<string>(isFsUrl ? '' : videoUrl);
+  const [isLoadingFirestore, setIsLoadingFirestore] = useState<boolean>(isFsUrl);
+  const [firestoreProgress, setFirestoreProgress] = useState<number>(0);
+  const [playerError, setPlayerError] = useState<string | null>(null);
+
+  // Fetch from Firestore if URL is an fs: ID
+  useEffect(() => {
+    if (videoUrl.startsWith('fs:')) {
+      const vidId = videoUrl.replace('fs:', '');
+      setIsLoadingFirestore(true);
+      setFirestoreProgress(10);
+      setPlayerError(null);
+
+      fetchVideoFromFirestore(vidId, (p) => setFirestoreProgress(p))
+        .then((res) => {
+          setResolvedUrl(res.blobUrl);
+          setIsLoadingFirestore(false);
+        })
+        .catch((err) => {
+          console.error('Failed to load video from Firestore:', err);
+          setPlayerError('Could not load video from cloud database. The video may have expired or been removed.');
+          setIsLoadingFirestore(false);
+        });
+    } else if (videoUrl.startsWith('blob:')) {
+      // If someone scanned a local blob URL from a desktop session
+      setPlayerError(
+        'This QR code contains a local session link that only exists in the PC memory where it was created. Please regenerate the QR code using the updated Cloud Stream!'
+      );
+      setIsLoadingFirestore(false);
+    } else {
+      setResolvedUrl(videoUrl);
+      setIsLoadingFirestore(false);
+      setPlayerError(null);
+    }
+  }, [videoUrl]);
+
+  const videoMeta = detectVideoSource(resolvedUrl || videoUrl);
   const isEmbed = ['youtube', 'vimeo', 'drive'].includes(videoMeta.type);
 
-  // Autoplay attempt on mount for direct HTML5 video
+  // Autoplay attempt on mount for direct HTML5 video once resolvedUrl is ready
   useEffect(() => {
-    if (!videoRef.current || isEmbed) return;
+    if (!videoRef.current || isEmbed || !resolvedUrl) return;
 
     const video = videoRef.current;
     video.load();
@@ -64,7 +103,6 @@ export const WatchPage: React.FC<WatchPageProps> = ({
       playPromise
         .then(() => {
           setIsPlaying(true);
-          // Show tap for sound banner
           setShowTapForSound(true);
         })
         .catch(() => {
@@ -72,7 +110,7 @@ export const WatchPage: React.FC<WatchPageProps> = ({
           setShowTapForSound(true);
         });
     }
-  }, [videoUrl, isEmbed]);
+  }, [resolvedUrl, isEmbed]);
 
   // Handle Fullscreen changes
   useEffect(() => {
@@ -238,15 +276,17 @@ export const WatchPage: React.FC<WatchPageProps> = ({
             )}
           </button>
 
-          <a
-            href={videoUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-1.5 text-xs font-medium bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-lg shadow-sm transition"
-          >
-            <ExternalLink className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Direct Link</span>
-          </a>
+          {resolvedUrl && resolvedUrl.startsWith('http') && (
+            <a
+              href={resolvedUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 text-xs font-medium bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-lg shadow-sm transition"
+            >
+              <ExternalLink className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Direct Link</span>
+            </a>
+          )}
         </div>
       </header>
 
@@ -278,7 +318,33 @@ export const WatchPage: React.FC<WatchPageProps> = ({
           onTouchStart={handleUserActivity}
           className="relative w-full aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl border border-slate-800/90 group flex items-center justify-center"
         >
-          {isEmbed ? (
+          {isLoadingFirestore ? (
+            <div className="flex flex-col items-center justify-center p-6 text-center space-y-3 z-30">
+              <div className="w-12 h-12 rounded-2xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 animate-spin">
+                <RotateCw className="w-6 h-6" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-white">Streaming video from Cloud...</p>
+                <p className="text-xs text-slate-400 mt-0.5">Assembling high-definition stream ({firestoreProgress}%)</p>
+              </div>
+              <div className="w-48 h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-indigo-500 transition-all duration-200"
+                  style={{ width: `${firestoreProgress}%` }}
+                />
+              </div>
+            </div>
+          ) : playerError ? (
+            <div className="flex flex-col items-center justify-center p-6 text-center space-y-3 z-30">
+              <p className="text-sm font-semibold text-rose-400">{playerError}</p>
+              <button
+                onClick={() => window.location.reload()}
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-xl transition cursor-pointer"
+              >
+                Reload Stream
+              </button>
+            </div>
+          ) : isEmbed ? (
             /* Embedded Iframe Player (YouTube / Vimeo / Drive) */
             <iframe
               src={videoMeta.embedUrl}
@@ -291,8 +357,8 @@ export const WatchPage: React.FC<WatchPageProps> = ({
             <>
               <video
                 ref={videoRef}
-                key={videoUrl}
-                src={videoUrl}
+                key={resolvedUrl}
+                src={resolvedUrl}
                 playsInline
                 preload="auto"
                 loop={isLooping}
@@ -300,6 +366,10 @@ export const WatchPage: React.FC<WatchPageProps> = ({
                 onLoadedMetadata={handleLoadedMetadata}
                 onPlay={() => setIsPlaying(true)}
                 onPause={() => setIsPlaying(false)}
+                onError={() => {
+                  if (!resolvedUrl) return;
+                  setPlayerError('Video format or stream could not be loaded. Tap reload to retry.');
+                }}
                 onClick={togglePlay}
                 className="w-full h-full object-contain cursor-pointer"
               />

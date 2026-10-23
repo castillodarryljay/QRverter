@@ -115,6 +115,61 @@
         "videoUrl",
         "destinationUrl"
       ]
+    },
+    "SharedVideo": {
+      "title": "SharedVideo",
+      "description": "Publicly scannable video metadata and chunk registry",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique video ID"
+        },
+        "title": {
+          "type": "string",
+          "description": "Video title"
+        },
+        "mimeType": {
+          "type": "string",
+          "description": "Video MIME type"
+        },
+        "totalChunks": {
+          "type": "number",
+          "description": "Total number of chunk parts"
+        },
+        "size": {
+          "type": "number",
+          "description": "Total byte size"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Upload timestamp"
+        }
+      },
+      "required": [
+        "id",
+        "mimeType",
+        "totalChunks"
+      ]
+    },
+    "VideoChunk": {
+      "title": "VideoChunk",
+      "description": "Chunked binary video stream payload part",
+      "type": "object",
+      "properties": {
+        "index": {
+          "type": "number",
+          "description": "Zero-based chunk index"
+        },
+        "data": {
+          "type": "string",
+          "description": "Base64 encoded binary chunk"
+        }
+      },
+      "required": [
+        "index",
+        "data"
+      ]
     }
   },
   "firestore": {
@@ -125,6 +180,14 @@
     "/users/{userId}/qrCodes/{qrCodeId}": {
       "schema": "QRCode",
       "description": "Saved QR codes belonging to a user"
+    },
+    "/sharedVideos/{videoId}": {
+      "schema": "SharedVideo",
+      "description": "Publicly scannable shared video metadata"
+    },
+    "/sharedVideos/{videoId}/chunks/{chunkId}": {
+      "schema": "VideoChunk",
+      "description": "Chunk parts of the shared video"
     }
   }
 }

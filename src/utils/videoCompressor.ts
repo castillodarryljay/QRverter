@@ -31,8 +31,8 @@ export async function compressVideoFile(
     onProgress,
   } = options;
 
-  // If file is already tiny (less than 2MB), skip heavy compression
-  if (file.size < 2 * 1024 * 1024) {
+  // If file is already compact (less than 4MB), skip heavy compression for 0ms delay
+  if (file.size < 4 * 1024 * 1024) {
     const objectUrl = URL.createObjectURL(file);
     return {
       compressedFile: file,
@@ -190,8 +190,8 @@ export async function compressVideoFile(
         reject(e);
       };
 
-      // Faster transcoding playback speed (1.75x) to speed up compression
-      video.playbackRate = 1.75;
+      // Faster transcoding playback speed (2.5x) to speed up compression significantly
+      video.playbackRate = 2.5;
 
       let animFrameId: number;
       const drawFrame = () => {

@@ -60,6 +60,7 @@ export default function App() {
   );
   const [publicVideoUrl, setPublicVideoUrl] = useState<string>('');
   const [videoTitle, setVideoTitle] = useState<string>('High Sierra Trail — 4K Stream');
+  const [uploadState, setUploadState] = useState<'idle' | 'compressing' | 'uploading' | 'ready' | 'error'>('idle');
 
   // QR Customization State
   const [qrConfig, setQrConfig] = useState<QRConfig>(DEFAULT_CONFIG);
@@ -160,11 +161,19 @@ export default function App() {
   }, []);
 
   // Compute live destination URL based on mode
-  const effectiveStreamUrl = publicVideoUrl || videoUrl;
-  const destinationUrl =
-    qrConfig.targetMode === 'watch-page'
-      ? buildWatchUrl(effectiveStreamUrl, videoTitle, appBaseUrl || (typeof window !== 'undefined' ? window.location.origin : ''))
-      : effectiveStreamUrl;
+  const isLocalBlob = videoUrl.startsWith('blob:');
+  const isCloudReady = !isLocalBlob || (!!publicVideoUrl && !publicVideoUrl.startsWith('blob:'));
+  const effectiveStreamUrl = publicVideoUrl || (isLocalBlob ? '' : videoUrl);
+
+  const destinationUrl = effectiveStreamUrl
+    ? qrConfig.targetMode === 'watch-page'
+      ? buildWatchUrl(
+          effectiveStreamUrl,
+          videoTitle,
+          appBaseUrl || (typeof window !== 'undefined' ? window.location.origin : '')
+        )
+      : effectiveStreamUrl
+    : '';
 
   // Load custom logo image if provided
   useEffect(() => {
@@ -182,7 +191,7 @@ export default function App() {
 
   // Master Canvas QR Renderer Trigger
   const triggerRender = useCallback(async () => {
-    if (!canvasRef.current) return;
+    if (!canvasRef.current || !destinationUrl) return;
     try {
       await renderQRToCanvas(
         canvasRef.current,
@@ -201,6 +210,10 @@ export default function App() {
 
   // Download Handlers
   const handleDownloadPNG = () => {
+    if (!isCloudReady || !destinationUrl) {
+      showToast('Video is syncing to cloud. Please wait a moment...', 'warning');
+      return;
+    }
     if (!canvasRef.current) return;
     const dataUrl = canvasRef.current.toDataURL('image/png');
     const a = document.createElement('a');
@@ -211,10 +224,14 @@ export default function App() {
     a.remove();
     confetti({ particleCount: 50, spread: 60, origin: { y: 0.8 } });
     showToast('High-resolution PNG QR Code downloaded!', 'success');
-    saveToHistory(destinationUrl, videoUrl, videoTitle);
+    saveToHistory(destinationUrl, effectiveStreamUrl || videoUrl, videoTitle);
   };
 
   const handleDownloadSVG = async () => {
+    if (!isCloudReady || !destinationUrl) {
+      showToast('Video is syncing to cloud. Please wait a moment...', 'warning');
+      return;
+    }
     try {
       const svgString = await exportQRAsSVG(destinationUrl, qrConfig);
       const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
@@ -228,13 +245,17 @@ export default function App() {
       setTimeout(() => URL.revokeObjectURL(url), 2000);
       confetti({ particleCount: 50, spread: 60, origin: { y: 0.8 } });
       showToast('Crisp Vector SVG QR Code downloaded!', 'success');
-      saveToHistory(destinationUrl, videoUrl, videoTitle);
+      saveToHistory(destinationUrl, effectiveStreamUrl || videoUrl, videoTitle);
     } catch {
       showToast('Could not generate SVG.', 'error');
     }
   };
 
   const handleCopyImage = async () => {
+    if (!isCloudReady || !destinationUrl) {
+      showToast('Video is syncing to cloud. Please wait a moment...', 'warning');
+      return;
+    }
     if (!canvasRef.current) return;
     try {
       canvasRef.current.toBlob(async (blob) => {
@@ -258,6 +279,10 @@ export default function App() {
   };
 
   const handleSaveToCloud = async () => {
+    if (!isCloudReady || !destinationUrl) {
+      showToast('Video is syncing to cloud. Please wait before saving.', 'warning');
+      return;
+    }
     if (!user) {
       try {
         await signInWithGoogle();
@@ -267,7 +292,7 @@ export default function App() {
       }
       return;
     }
-    const saved = await saveCurrentQRToCloud(videoTitle, videoUrl, destinationUrl, qrConfig);
+    const saved = await saveCurrentQRToCloud(videoTitle, effectiveStreamUrl || videoUrl, destinationUrl, qrConfig);
     if (saved) {
       confetti({ particleCount: 35, spread: 55, origin: { y: 0.8 } });
       showToast('Saved video QR code to your Google account!', 'success');
@@ -467,6 +492,7 @@ export default function App() {
               }}
               onTitleChange={setVideoTitle}
               onShowToast={showToast}
+              onUploadStateChange={setUploadState}
             />
 
             <QRCustomizer
@@ -483,12 +509,14 @@ export default function App() {
               canvasRef={canvasRef}
               destinationUrl={destinationUrl}
               config={qrConfig}
+              isCloudReady={isCloudReady}
+              uploadState={uploadState}
               onDownloadPNG={handleDownloadPNG}
               onDownloadSVG={handleDownloadSVG}
               onCopyImage={handleCopyImage}
               onOpenScannerModal={() => setIsScannerOpen(true)}
               onOpenWatchPage={() => {
-                setCurrentWatchUrl(videoUrl);
+                setCurrentWatchUrl(effectiveStreamUrl || videoUrl);
                 setCurrentWatchTitle(videoTitle);
               }}
               onSaveToCloud={handleSaveToCloud}

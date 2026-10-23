@@ -70,5 +70,18 @@ service cloud.firestore {
         allow delete: if isOwner(userId);
       }
     }
+
+    // Public shared videos registry for scannable QR streaming across any mobile device
+    match /sharedVideos/{videoId} {
+      allow read: if true;
+      allow create: if isValidId(videoId);
+      allow update, delete: if false;
+
+      match /chunks/{chunkId} {
+        allow read: if true;
+        allow create: if true;
+        allow update, delete: if false;
+      }
+    }
   }
 }
